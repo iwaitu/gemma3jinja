@@ -39,26 +39,26 @@
             {%- endfor -%}
         {%- endif -%}
     {%- endif -%}
-    
-    {# 处理 tool_calls 部分 #}
-    {%- if message.get("tool_calls") -%}
-        {{ '[' }}
+
+    {# 渲染 tool_calls（修复了参数 key 的遍历方式） #}
+    {%- if 'tool_calls' in message -%}
+        [
         {%- for tool_call in message.tool_calls -%}
-            {%- set tc = tool_call -%}
-            {%- if tc.get("function") -%}
-                {%- set tc = tc.function -%}
+            {%- if tool_call.function is defined -%}
+                {%- set tool_call = tool_call.function -%}
             {%- endif -%}
-            {{ tc.name + '(' }}
-            {%- for key, val in tc.arguments.items() -%}
-                {{ key + '=' + val }}
+            {{ tool_call.name + '(' }}
+            {%- for param in tool_call.arguments.keys() -%}
+                {{ param + '=' }}
+                {{ "%sr" | format(tool_call.arguments[param]) }}
                 {%- if not loop.last -%}, {% endif -%}
             {%- endfor -%}
             {{ ')' }}
-            {%- if not loop.last -%}, {% endif -%}
+            {%- if not loop.last -%},{% endif -%}
         {%- endfor -%}
-        {{ ']' }}
+        ]
     {%- endif -%}
-    
+
     {%- if message['role'] == 'tool' -%}
         {{ '<tool_response>\n' -}}
     {%- endif -%}
