@@ -102,10 +102,10 @@
         {{ '</tool_response>' -}}
     {%- endif %}
 
-<end_of_turn>
+{{'<end_of_turn>'}}
 {%- endfor %}
 
 {#- 是否需要继续生成下一轮 model 响应 -#}
 {%- if add_generation_prompt %}
-<start_of_turn>model
+    {{'<start_of_turn>model\n'}}
 {%- endif %}
