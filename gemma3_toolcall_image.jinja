@@ -50,19 +50,19 @@
 
     {#- 渲染工具调用（标准 JSON 格式） -#}
     {%- if 'tool_calls' in message %}
-[
-{%- for tool_call in message.tool_calls %}
-    {%- if tool_call.function is defined %}
-        {%- set func = tool_call.function %}
-    {%- else %}
-        {%- set func = tool_call %}
-    {%- endif %}
-    {
-        "name": "{{ func.name }}",
-        "arguments": {{ func.arguments | tojson }}
-    }{%- if not loop.last %}, {% endif %}
-{%- endfor %}
-]
+    [
+    {%- for tool_call in message.tool_calls %}
+        {%- if tool_call.function is defined %}
+            {%- set func = tool_call.function %}
+        {%- else %}
+            {%- set func = tool_call %}
+        {%- endif %}
+        {
+            "name": "{{ func.name }}",
+            "arguments": {{ func.arguments | tojson }}
+        }{%- if not loop.last %}, {% endif %}
+    {%- endfor %}
+    ]
     {%- endif %}
 
     {#- 工具响应开始标签 -#}
