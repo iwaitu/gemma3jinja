@@ -1,0 +1,98 @@
+{#- Begin-of-sequence token to start the model prompt -#}
+{{ bos_token }}
+{#- 处理 system message（Gemma 不支持，需要塞到第一轮 user 前面） -#}
+{%- if messages[0]['role'] == 'system' -%}
+    {%- if messages[0]['content'] is string -%}
+        {%- set first_user_prefix = messages[0]['content'] + '\n\n' -%}
+    {%- else -%}
+        {%- set first_user_prefix = messages[0]['content'][0]['text'] + '\n\n' -%}
+    {%- endif -%}
+    {%- set loop_messages = messages[1:] -%}
+{%- else -%}
+    {%- set first_user_prefix = "" -%}
+    {%- set loop_messages = messages -%}
+{%- endif -%}
+
+{#- tools 未定义时设为 none -#}
+{%- if not tools is defined %}
+    {%- set tools = none %}
+{%- endif %}
+
+{#- 校验 user/assistant 轮流出现 -#}
+{%- for message in loop_messages | rejectattr("role", "equalto", "tool") | selectattr("tool_calls", "undefined") %}
+    {%- if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}
+        {{ raise_exception("Conversation roles must alternate user/assistant/user/assistant/...") }}
+    {%- endif %}
+{%- endfor %}
+
+{#- 主消息循环 -#}
+{%- for message in loop_messages %}
+    {%- if message['role'] == 'assistant' %}
+        {%- set role = "model" %}
+    {%- elif message['role'] == 'tool' %}
+        {%- set role = "user" %}
+    {%- else %}
+        {%- set role = message['role'] %}
+    {%- endif %}
+
+    {{ '<start_of_turn>' + role + '\n' }}
+
+    {%- if loop.first %}
+        {{ first_user_prefix }}
+        {%- if tools is not none %}
+            {{- "Tools (functions) are available. If you decide to invoke one or more of the tools, you must respond with a python list of the function calls.\n" -}}
+            {{- "Example Format: [func_name1(params_name1=params_value1, params_name2=params_value2...), func_name2(params)] \n" -}}
+            {{- "Do not use variables. DO NOT USE MARKDOWN SYNTAX. You SHOULD NOT include any other text in the response if you call a function. If none of the functions can be used, point it out. If you lack the parameters required by the function, also point it out.\n" -}}
+            {{- "Here is a list of functions in JSON format that you can invoke.\n" -}}
+            {{- tools | tojson(indent=4) -}}
+        {%- endif %}
+    {%- endif %}
+
+    {#- 渲染工具调用（标准 JSON 格式） -#}
+    {%- if 'tool_calls' in message %}
+[
+{%- for tool_call in message.tool_calls %}
+    {%- if tool_call.function is defined %}
+        {%- set func = tool_call.function %}
+    {%- else %}
+        {%- set func = tool_call %}
+    {%- endif %}
+    {
+        "name": "{{ func.name }}",
+        "arguments": {{ func.arguments | tojson }}
+    }{%- if not loop.last %}, {% endif %}
+{%- endfor %}
+]
+    {%- endif %}
+
+    {#- 工具响应开始标签 -#}
+    {%- if message['role'] == 'tool' %}
+<tool_response>
+    {%- endif %}
+
+    {#- 渲染内容：字符串或 multimodal（含 image） -#}
+    {%- if message['content'] is string %}
+        {{ message['content'] | trim }}
+    {%- elif message['content'] is iterable %}
+        {%- for item in message['content'] %}
+            {%- if item['type'] == 'image' %}
+<start_of_image>
+            {%- elif item['type'] == 'text' %}
+{{ item['text'] | trim }}
+            {%- endif %}
+        {%- endfor %}
+    {%- else %}
+        {{ raise_exception("Invalid content type") }}
+    {%- endif %}
+
+    {%- if message['role'] == 'tool' %}
+</tool_response>
+    {%- endif %}
+
+<end_of_turn>
+{%- endfor %}
+
+{#- 是否需要继续生成下一轮 model 响应 -#}
+{%- if add_generation_prompt %}
+<start_of_turn>model
+{%- endif %}
