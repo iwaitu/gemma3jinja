@@ -83,7 +83,7 @@
 
     {#- 工具响应开始标签 -#}
     {%- if message['role'] == 'tool' %}
-<tool_response>
+        {{ '<tool_response>' -}}
     {%- endif %}
 
     {#- 渲染内容：字符串或 multimodal（含 image） -#}
@@ -99,7 +99,7 @@
 
 
     {%- if message['role'] == 'tool' %}
-</tool_response>
+        {{ '</tool_response>' -}}
     {%- endif %}
 
 <end_of_turn>
